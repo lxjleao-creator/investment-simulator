@@ -599,7 +599,7 @@ function trade(side) {
     queueOrder({ side, symbol: selectedSymbol, amount, reason });
     closeSheet();
     render();
-    switchView("market");
+    keepMarketView();
     showStatus(`${asset.name} 现在不是交易时间，订单已进入“待成交订单”。开盘后刷新页面会按模拟市价成交。`);
     return;
   }
@@ -660,7 +660,7 @@ function executeOrder(order) {
   saveState();
   closeSheet();
   render();
-  switchView("market");
+  keepMarketView();
   const action = side === "buy" ? "买入" : "卖出";
   const holdingValue = getHoldingValue(order.symbol);
   showStatus(`已${action} ${asset.name} ${money(amount)}，模拟成交价 ${formatPrice({ ...quote, price: execution.price })}，费用 ${money(feeDetails.total)}。现在持仓约 ${money(holdingValue)}，现金剩余 ${money(state.cash)}。`);
@@ -767,6 +767,11 @@ function switchView(viewName) {
   });
   document.querySelectorAll(".view").forEach((view) => view.classList.remove("active"));
   document.querySelector(`#${viewName}View`).classList.add("active");
+}
+
+function keepMarketView() {
+  switchView("market");
+  document.querySelector("#marketView")?.scrollIntoView({ block: "start", behavior: "auto" });
 }
 
 function showStatus(message) {
