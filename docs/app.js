@@ -90,6 +90,7 @@ let staticQuoteCache = null;
 const els = {
   totalValue: document.querySelector("#totalValue"),
   cashValue: document.querySelector("#cashValue"),
+  frozenValue: document.querySelector("#frozenValue"),
   holdingValue: document.querySelector("#holdingValue"),
   pnlValue: document.querySelector("#pnlValue"),
   updatedAt: document.querySelector("#updatedAt"),
@@ -262,11 +263,15 @@ function getAssetTradeState(symbol) {
 function getAccountSnapshot() {
   const holdingValue = Object.keys(state.positions).reduce((sum, symbol) => sum + getHoldingValue(symbol), 0);
   const totalCost = Object.values(state.positions).reduce((sum, position) => sum + position.cost, 0);
+  const frozenCash = (state.pendingOrders || [])
+    .filter((order) => order.side === "buy")
+    .reduce((sum, order) => sum + (order.reservedCash || 0), 0);
   return {
+    frozenCash,
     holdingValue,
     totalCost,
     pnl: holdingValue - totalCost,
-    total: state.cash + holdingValue
+    total: state.cash + frozenCash + holdingValue
   };
 }
 
@@ -274,6 +279,7 @@ function renderAccount() {
   const snapshot = getAccountSnapshot();
   els.totalValue.textContent = money(snapshot.total);
   els.cashValue.textContent = money(state.cash);
+  els.frozenValue.textContent = money(snapshot.frozenCash);
   els.holdingValue.textContent = money(snapshot.holdingValue);
   els.pnlValue.textContent = money(snapshot.pnl);
   els.pnlValue.className = snapshot.pnl >= 0 ? "good" : "bad";
@@ -447,7 +453,8 @@ function renderPendingOrders() {
   els.pendingOrders.innerHTML = orders.map((order) => {
     const asset = ASSETS.find((item) => item.symbol === order.symbol);
     const side = order.side === "buy" ? "买入" : "卖出";
-    return `<li>${order.time} · ${side} ${asset?.name || order.symbol} ${money(order.amount)}，等待${asset?.market === "US" ? "美股" : "A股"}开盘后按模拟市价成交。</li>`;
+    const frozenText = order.side === "buy" && order.reservedCash ? `，已冻结 ${money(order.reservedCash)}` : "";
+    return `<li>${order.time} · ${side} ${asset?.name || order.symbol} ${money(order.amount)}${frozenText}，等待${asset?.market === "US" ? "美股" : "A股"}开盘后按模拟市价成交。</li>`;
   }).join("") || "<li>没有待成交订单。交易时间外下单会先放在这里。</li>";
 }
 
@@ -596,11 +603,16 @@ function trade(side) {
   const market = getMarketStatus(asset);
 
   if (!market.open) {
-    queueOrder({ side, symbol: selectedSymbol, amount, reason });
+    if (side === "buy" && amount > state.cash) {
+      els.tradeHint.textContent = "可用现金不够。已有待成交订单会冻结现金。";
+      return;
+    }
+    if (side === "buy") state.cash -= amount;
+    queueOrder({ side, symbol: selectedSymbol, amount, reason, reservedCash: side === "buy" ? amount : 0 });
     closeSheet();
     render();
     keepMarketView();
-    showStatus(`${asset.name} 现在不是交易时间，订单已进入“待成交订单”。开盘后刷新页面会按模拟市价成交。`);
+    showStatus(`${asset.name} 现在不是交易时间，订单已进入“待成交订单”。${side === "buy" ? `已冻结 ${money(amount)}，可用现金剩余 ${money(state.cash)}。` : ""}开盘后刷新页面会按模拟市价成交。`);
     return;
   }
 
@@ -618,7 +630,9 @@ function executeOrder(order) {
   let feeDetails = { total: 0, items: [] };
 
   if (side === "buy") {
-    if (amount > state.cash) {
+    const reservedCash = order.reservedCash || 0;
+    const needsCash = Math.max(0, amount - reservedCash);
+    if (needsCash > state.cash) {
       els.tradeHint.textContent = "现金不够。规律练习：现金也是仓位的一部分。";
       return;
     }
@@ -627,7 +641,7 @@ function executeOrder(order) {
     const shares = investable / (execution.price * quote.fx);
     position.shares += shares;
     position.cost += amount;
-    state.cash -= amount;
+    state.cash -= needsCash;
   } else {
     const currentValue = position.shares * execution.price * quote.fx;
     if (currentValue <= 0) {
@@ -670,14 +684,19 @@ function showPendingNotice(symbol) {
   const asset = ASSETS.find((item) => item.symbol === symbol);
   const pendingBuy = getPendingAmount(symbol, "buy");
   const pendingSell = getPendingAmount(symbol, "sell");
+  const frozenCash = getPendingOrders(symbol)
+    .filter((order) => order.side === "buy")
+    .reduce((sum, order) => sum + (order.reservedCash || 0), 0);
   const amountText = pendingBuy > 0 ? `待买入 ${money(pendingBuy)}` : `待卖出 ${money(pendingSell)}`;
-  showStatus(`${asset.name} 已经有订单在等待成交：${amountText}。现实中可以继续追加新订单，也可以等它成交；开盘后刷新页面会尝试成交。`);
+  const frozenText = frozenCash > 0 ? `，已冻结 ${money(frozenCash)}` : "";
+  showStatus(`${asset.name} 已经有订单在等待成交：${amountText}${frozenText}。现实中可以继续追加新订单，也可以等它成交；开盘后刷新页面会尝试成交。`);
 }
 
 function queueOrder(order) {
   state.pendingOrders = state.pendingOrders || [];
   state.pendingOrders.push({
     ...order,
+    reservedCash: order.reservedCash || 0,
     time: new Date().toLocaleString("zh-CN", { month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hour12: false })
   });
   saveState();
