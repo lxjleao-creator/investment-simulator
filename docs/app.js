@@ -771,7 +771,6 @@ function switchView(viewName) {
 
 function keepMarketView() {
   switchView("market");
-  document.querySelector("#marketView")?.scrollIntoView({ block: "start", behavior: "auto" });
 }
 
 function showStatus(message) {
