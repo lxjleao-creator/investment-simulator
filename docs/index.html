@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#0f172a">
+  <title>投资规律模拟器</title>
+  <link rel="icon" href="./favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+  <main class="app">
+    <div id="statusToast" class="status-toast" aria-live="polite"></div>
+    <header class="topbar">
+      <div>
+        <p class="eyebrow">虚拟资金 · 真实市场波动</p>
+        <h1>投资规律模拟器</h1>
+      </div>
+      <button id="refreshBtn" class="icon-btn" type="button" title="刷新行情">↻</button>
+    </header>
+
+    <section class="account-panel">
+      <div>
+        <span class="label">模拟总资产</span>
+        <strong id="totalValue">¥50,000.00</strong>
+      </div>
+      <div class="account-grid">
+        <span>现金 <b id="cashValue">¥50,000.00</b></span>
+        <span>持仓 <b id="holdingValue">¥0.00</b></span>
+        <span>盈亏 <b id="pnlValue">¥0.00</b></span>
+      </div>
+    </section>
+
+    <section class="tabs" aria-label="视图切换">
+      <button class="tab active" data-view="market" type="button">市场</button>
+      <button class="tab" data-view="portfolio" type="button">组合</button>
+      <button class="tab" data-view="rules" type="button">规律</button>
+    </section>
+
+    <section id="marketView" class="view active">
+      <div class="section-head">
+        <h2>观察池</h2>
+        <p id="updatedAt">正在读取行情...</p>
+      </div>
+      <div id="assetList" class="asset-list"></div>
+    </section>
+
+    <section id="portfolioView" class="view">
+      <div class="section-head">
+        <h2>虚拟持仓</h2>
+        <button id="resetBtn" class="small-btn" type="button">重置</button>
+      </div>
+      <div id="positions" class="positions empty"></div>
+      <div class="trade-log">
+        <h3>待成交订单</h3>
+        <ol id="pendingOrders"></ol>
+      </div>
+      <div class="trade-log">
+        <h3>交易记录</h3>
+        <ol id="tradeLog"></ol>
+      </div>
+    </section>
+
+    <section id="rulesView" class="view">
+      <div class="rule-card">
+        <h2>这版主要练 5 条规律</h2>
+        <ul>
+          <li><b>分散</b>：不要把 50,000 元都放在一个市场。</li>
+          <li><b>分批</b>：同一个标的分 3-5 次买，降低一次买在高点的风险。</li>
+          <li><b>回撤</b>：涨得快的资产，也经常跌得快。</li>
+          <li><b>纪律</b>：先写买入理由，再买；先设卖出条件，再卖。</li>
+          <li><b>长期</b>：指数基金更适合观察几个月到几年，不适合每天赌涨跌。</li>
+        </ul>
+      </div>
+      <div id="insights" class="insights"></div>
+    </section>
+  </main>
+
+  <div id="tradeSheet" class="sheet" aria-hidden="true">
+    <div class="sheet-panel">
+      <div class="sheet-head">
+        <div>
+          <span id="tradeAssetType" class="pill"></span>
+          <h2 id="tradeTitle">虚拟交易</h2>
+        </div>
+        <button id="closeSheet" class="icon-btn" type="button" title="关闭">×</button>
+      </div>
+      <div class="quote-row">
+        <span>当前价格</span>
+        <b id="tradePrice">--</b>
+      </div>
+      <label class="field">
+        <span>金额</span>
+        <input id="tradeAmount" inputmode="decimal" type="number" min="100" step="100" value="1000">
+      </label>
+      <label class="field">
+        <span>这次买/卖的理由</span>
+        <textarea id="tradeReason" rows="3" placeholder="例如：分批买入，观察回撤后是否企稳"></textarea>
+      </label>
+      <div class="sheet-actions">
+        <button id="buyBtn" class="primary" type="button">虚拟买入</button>
+        <button id="sellBtn" class="secondary" type="button">虚拟卖出</button>
+      </div>
+      <p id="tradeHint" class="hint"></p>
+    </div>
+  </div>
+
+  <script src="./app.js"></script>
+</body>
+</html>
