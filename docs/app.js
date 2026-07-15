@@ -105,7 +105,11 @@ const els = {
   tradePrice: document.querySelector("#tradePrice"),
   tradeAmount: document.querySelector("#tradeAmount"),
   tradeReason: document.querySelector("#tradeReason"),
-  tradeHint: document.querySelector("#tradeHint")
+  tradeHint: document.querySelector("#tradeHint"),
+  lessonSheet: document.querySelector("#lessonSheet"),
+  lessonTag: document.querySelector("#lessonTag"),
+  lessonTitle: document.querySelector("#lessonTitle"),
+  lessonBody: document.querySelector("#lessonBody")
 };
 
 document.querySelector("#refreshBtn").addEventListener("click", refreshQuotes);
@@ -113,6 +117,7 @@ document.querySelector("#closeSheet").addEventListener("click", closeSheet);
 document.querySelector("#buyBtn").addEventListener("click", () => trade("buy"));
 document.querySelector("#sellBtn").addEventListener("click", () => trade("sell"));
 document.querySelector("#resetBtn").addEventListener("click", resetPortfolio);
+document.querySelector("#closeLesson").addEventListener("click", closeLesson);
 
 document.querySelectorAll(".tab").forEach((tab) => {
   tab.addEventListener("click", () => {
@@ -137,7 +142,7 @@ async function refreshQuotes() {
 }
 
 async function fetchQuote(asset) {
-  const localApiAvailable = ["localhost", "127.0.0.1"].includes(window.location.hostname);
+  const localApiAvailable = ["localhost", "127.0.0.1"].includes(window.location.hostname) && window.location.port === "8787";
 
   if (!localApiAvailable) {
     const staticQuote = await fetchStaticQuote(asset);
@@ -279,11 +284,11 @@ function renderAssets() {
     const holdingCost = position?.cost || 0;
     const holdingPnl = holdingValue - holdingCost;
     const holdingHtml = holdingValue > 0 ? `
-        <div class="holding-badge">
+        <button class="holding-badge learn-btn" type="button" onclick="openLesson('holding', '${asset.symbol}')">
           <strong>已持仓 ${money(holdingValue)}</strong>
           <span class="${holdingPnl >= 0 ? "good" : "bad"}">${money(holdingPnl)}</span>
           <small>成本 ${money(holdingCost)} · ${position.shares.toFixed(4)} 份</small>
-        </div>
+        </button>
       ` : "";
     return `
       <article class="asset-card">
@@ -292,17 +297,17 @@ function renderAssets() {
             <div class="asset-name">${asset.name}</div>
             <div class="asset-meta">${asset.symbol} · ${asset.type} · ${market.label} · ${quote.source === "live" ? "真实行情" : "样例波动"}</div>
           </div>
-          <div class="price">
+          <button class="price learn-btn" type="button" onclick="openLesson('price', '${asset.symbol}')">
             <b>${formatPrice(quote)}</b>
             <span class="change ${quote.changePct >= 0 ? "good" : "bad"}">${signed(quote.changePct)}%</span>
-          </div>
+          </button>
         </div>
         ${sparkline(quote.series, quote.changePct >= 0 ? "#087f5b" : "#c92a2a")}
         ${holdingHtml}
-        <div class="recommendation">
+        <button class="recommendation learn-btn" type="button" onclick="openLesson('suggestion', '${asset.symbol}')">
           <strong>${suggestion.summary}</strong>
           <span>${suggestion.reasons.join("；")}。</span>
-        </div>
+        </button>
         <p class="lesson">${asset.lesson}</p>
         <div class="asset-actions">
           <button class="primary" type="button" onclick="openSheet('${asset.symbol}')">按建议模拟</button>
@@ -412,6 +417,75 @@ function openSheet(symbol) {
 function closeSheet() {
   els.tradeSheet.classList.remove("open");
   els.tradeSheet.setAttribute("aria-hidden", "true");
+}
+
+function openLesson(kind, symbol) {
+  const asset = ASSETS.find((item) => item.symbol === symbol);
+  const quote = quotes[symbol];
+  const suggestion = getSuggestion(symbol);
+  const holdingValue = getHoldingValue(symbol);
+  const position = state.positions[symbol];
+  const holdingCost = position?.cost || 0;
+  const holdingPnl = holdingValue - holdingCost;
+  const market = getMarketStatus(asset);
+
+  const lessons = {
+    price: {
+      tag: "行情",
+      title: `${asset.name} 的价格和涨跌幅`,
+      blocks: [
+        ["这个价格是什么", `${formatPrice(quote)} 是这个 ETF 最近一次行情价格。美股标的是美元价格，A股标的是人民币价格。你的账户总资产统一折算成人民币显示。`],
+        ["-1.90% / +1.28% 是什么", `这是最近一个交易日相对上一个收盘价的涨跌幅。它说明今天市场往哪个方向动，不代表你已经赚钱或亏钱。`],
+        ["怎么用它", `价格和涨跌幅适合用来观察波动：大涨时避免冲动追高，大跌时也不要一次买满。模拟器会把这个波动放进“建议金额”的计算里。`],
+        ["常见误区", `看到绿色不等于可以买，看到红色也不等于便宜。真正重要的是你的买入成本、持仓比例、计划周期和能承受的回撤。`]
+      ]
+    },
+    suggestion: {
+      tag: "建议金额",
+      title: "为什么建议买这个金额",
+      blocks: [
+        ["建议金额是什么", `${suggestion.summary} 这是模拟器给你的练习金额，不是真实投资建议，也不会自动帮你真实下单。`],
+        ["目标约是什么意思", `目标约 ${Math.round(asset.targetWeight * 100)}% 表示这个标的在模拟组合里理想占比。比如 50,000 元本金，15% 目标大约是 7,500 元。`],
+        ["当前约是什么意思", `当前约表示你现在已经持有这个标的占总资产的比例。当前越接近目标，新增买入金额通常越小。`],
+        ["为什么不是一次买够", `为了练习真实投资里的分批和仓位控制，单笔买入有上限。涨得快会降低建议金额，有回撤会略微提高练习金额，但不会鼓励满仓。`]
+      ]
+    },
+    holding: {
+      tag: "持仓",
+      title: `${asset.name} 的持仓金额`,
+      blocks: [
+        ["已持仓是什么", `已持仓 ${money(holdingValue)} 是按当前行情估算出来的市值，不是现金。它会随着价格变化而变动。`],
+        ["成本和份额是什么", `成本 ${money(holdingCost)} 是你累计投入到这个标的里的模拟本金；份额是你买到的数量。`],
+        ["盈亏是什么", `${money(holdingPnl)} 是浮动盈亏，也就是当前市值减去成本。没有卖出前，它只是账面变化。`],
+        ["怎么理解", `如果你卖出，模拟器会按交易时间、模拟成交价、滑点和手续费计算现金。持仓盈利不等于已经落袋。`]
+      ]
+    },
+    market: {
+      tag: "交易时间",
+      title: "真实行情和交易时间",
+      blocks: [
+        ["当前市场状态", `${market.label}。交易时间内下单会模拟市价成交；休市时下单会进入待成交订单。`],
+        ["为什么会这样", `真实市场不是 24 小时都能成交。股票和 ETF 通常需要在交易时间里撮合成交，基金赎回还会更慢。`]
+      ]
+    }
+  };
+
+  const lesson = lessons[kind] || lessons.price;
+  els.lessonTag.textContent = lesson.tag;
+  els.lessonTitle.textContent = lesson.title;
+  els.lessonBody.innerHTML = lesson.blocks.map(([heading, body]) => `
+    <section class="lesson-block">
+      <strong>${heading}</strong>
+      <p>${body}</p>
+    </section>
+  `).join("");
+  els.lessonSheet.classList.add("open");
+  els.lessonSheet.setAttribute("aria-hidden", "false");
+}
+
+function closeLesson() {
+  els.lessonSheet.classList.remove("open");
+  els.lessonSheet.setAttribute("aria-hidden", "true");
 }
 
 function trade(side) {
