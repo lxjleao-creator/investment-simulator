@@ -345,13 +345,13 @@ function renderAssets() {
         </button>
       ` : "";
     const pendingHtml = pendingBuy > 0 ? `
-        <button class="pending-badge learn-btn" type="button" onclick="switchView('portfolio')">
+        <button class="pending-badge learn-btn" type="button" onclick="showPendingNotice('${asset.symbol}')">
           <strong>待成交买入 ${money(pendingBuy)}</strong>
           <span>已提交，开盘后刷新会尝试成交</span>
         </button>
       ` : "";
     const primaryAction = pendingBuy > 0
-      ? `<button class="primary muted-primary" type="button" onclick="switchView('portfolio')">查看待成交</button>`
+      ? `<button class="primary muted-primary" type="button" onclick="showPendingNotice('${asset.symbol}')">已待成交</button>`
       : `<button class="primary" type="button" onclick="openSheet('${asset.symbol}')">${holdingValue > 0 ? "追加模拟" : "按建议模拟"}</button>`;
     return `
       <article class="asset-card">
@@ -599,6 +599,7 @@ function trade(side) {
     queueOrder({ side, symbol: selectedSymbol, amount, reason });
     closeSheet();
     render();
+    switchView("market");
     showStatus(`${asset.name} 现在不是交易时间，订单已进入“待成交订单”。开盘后刷新页面会按模拟市价成交。`);
     return;
   }
@@ -659,9 +660,18 @@ function executeOrder(order) {
   saveState();
   closeSheet();
   render();
+  switchView("market");
   const action = side === "buy" ? "买入" : "卖出";
   const holdingValue = getHoldingValue(order.symbol);
   showStatus(`已${action} ${asset.name} ${money(amount)}，模拟成交价 ${formatPrice({ ...quote, price: execution.price })}，费用 ${money(feeDetails.total)}。现在持仓约 ${money(holdingValue)}，现金剩余 ${money(state.cash)}。`);
+}
+
+function showPendingNotice(symbol) {
+  const asset = ASSETS.find((item) => item.symbol === symbol);
+  const pendingBuy = getPendingAmount(symbol, "buy");
+  const pendingSell = getPendingAmount(symbol, "sell");
+  const amountText = pendingBuy > 0 ? `待买入 ${money(pendingBuy)}` : `待卖出 ${money(pendingSell)}`;
+  showStatus(`${asset.name} 已经有订单在等待成交：${amountText}。不用重复操作，开盘后刷新页面会尝试成交。`);
 }
 
 function queueOrder(order) {
