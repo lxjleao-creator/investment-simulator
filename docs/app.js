@@ -94,6 +94,7 @@ const els = {
   pnlValue: document.querySelector("#pnlValue"),
   updatedAt: document.querySelector("#updatedAt"),
   assetList: document.querySelector("#assetList"),
+  tradeStatusSummary: document.querySelector("#tradeStatusSummary"),
   positions: document.querySelector("#positions"),
   pendingOrders: document.querySelector("#pendingOrders"),
   tradeLog: document.querySelector("#tradeLog"),
@@ -194,6 +195,7 @@ function makeQuote(asset, series, source) {
 function render() {
   renderAccount();
   renderAssets();
+  renderTradeStatusSummary();
   renderPositions();
   renderPendingOrders();
   renderLog();
@@ -205,6 +207,56 @@ function getHoldingValue(symbol) {
   const position = state.positions[symbol];
   if (!quote || !position) return 0;
   return position.shares * quote.price * quote.fx;
+}
+
+function getPendingOrders(symbol) {
+  return (state.pendingOrders || []).filter((order) => order.symbol === symbol);
+}
+
+function getPendingAmount(symbol, side = null) {
+  return getPendingOrders(symbol)
+    .filter((order) => !side || order.side === side)
+    .reduce((sum, order) => sum + order.amount, 0);
+}
+
+function getAssetTradeState(symbol) {
+  const holdingValue = getHoldingValue(symbol);
+  const pendingBuy = getPendingAmount(symbol, "buy");
+  const pendingSell = getPendingAmount(symbol, "sell");
+
+  if (holdingValue > 0 && pendingSell > 0) {
+    return {
+      tone: "warning",
+      label: "持仓中，有卖出待成交",
+      detail: `已成交持仓 ${money(holdingValue)}，待卖出 ${money(pendingSell)}`
+    };
+  }
+  if (holdingValue > 0) {
+    return {
+      tone: "success",
+      label: "已成功买入",
+      detail: `当前已持仓 ${money(holdingValue)}`
+    };
+  }
+  if (pendingBuy > 0) {
+    return {
+      tone: "pending",
+      label: "已下单，等待成交",
+      detail: `待买入 ${money(pendingBuy)}，不用重复买`
+    };
+  }
+  if (pendingSell > 0) {
+    return {
+      tone: "pending",
+      label: "卖出等待成交",
+      detail: `待卖出 ${money(pendingSell)}`
+    };
+  }
+  return {
+    tone: "empty",
+    label: "未持有",
+    detail: "还没有买入或待成交订单"
+  };
 }
 
 function getAccountSnapshot() {
@@ -280,6 +332,8 @@ function renderAssets() {
     const suggestion = getSuggestion(asset.symbol);
     const market = getMarketStatus(asset);
     const holdingValue = getHoldingValue(asset.symbol);
+    const tradeState = getAssetTradeState(asset.symbol);
+    const pendingBuy = getPendingAmount(asset.symbol, "buy");
     const position = state.positions[asset.symbol];
     const holdingCost = position?.cost || 0;
     const holdingPnl = holdingValue - holdingCost;
@@ -290,6 +344,15 @@ function renderAssets() {
           <small>成本 ${money(holdingCost)} · ${position.shares.toFixed(4)} 份</small>
         </button>
       ` : "";
+    const pendingHtml = pendingBuy > 0 ? `
+        <button class="pending-badge learn-btn" type="button" onclick="switchView('portfolio')">
+          <strong>待成交买入 ${money(pendingBuy)}</strong>
+          <span>已提交，开盘后刷新会尝试成交</span>
+        </button>
+      ` : "";
+    const primaryAction = pendingBuy > 0
+      ? `<button class="primary muted-primary" type="button" onclick="switchView('portfolio')">查看待成交</button>`
+      : `<button class="primary" type="button" onclick="openSheet('${asset.symbol}')">${holdingValue > 0 ? "追加模拟" : "按建议模拟"}</button>`;
     return `
       <article class="asset-card">
         <div class="asset-top">
@@ -302,20 +365,53 @@ function renderAssets() {
             <span class="change ${quote.changePct >= 0 ? "good" : "bad"}">${signed(quote.changePct)}%</span>
           </button>
         </div>
+        <div class="trade-state ${tradeState.tone}">
+          <strong>${tradeState.label}</strong>
+          <span>${tradeState.detail}</span>
+        </div>
         ${sparkline(quote.series, quote.changePct >= 0 ? "#087f5b" : "#c92a2a")}
         ${holdingHtml}
+        ${pendingHtml}
         <button class="recommendation learn-btn" type="button" onclick="openLesson('suggestion', '${asset.symbol}')">
           <strong>${suggestion.summary}</strong>
           <span>${suggestion.reasons.join("；")}。</span>
         </button>
         <p class="lesson">${asset.lesson}</p>
         <div class="asset-actions">
-          <button class="primary" type="button" onclick="openSheet('${asset.symbol}')">按建议模拟</button>
+          ${primaryAction}
           <button class="secondary" type="button" onclick="quickPlan('${asset.symbol}')">规律提示</button>
         </div>
       </article>
     `;
   }).join("");
+}
+
+function renderTradeStatusSummary() {
+  const rows = ASSETS
+    .map((asset) => ({ asset, state: getAssetTradeState(asset.symbol) }))
+    .filter(({ state }) => state.tone !== "empty");
+
+  if (!rows.length) {
+    els.tradeStatusSummary.innerHTML = `
+      <article class="summary-card empty-summary">
+        <strong>还没有任何买入</strong>
+        <span>买入成功会显示在“已成交持仓”；休市下单会显示在“待成交订单”。</span>
+      </article>
+    `;
+    return;
+  }
+
+  els.tradeStatusSummary.innerHTML = `
+    <div class="summary-grid">
+      ${rows.map(({ asset, state }) => `
+        <article class="summary-card ${state.tone}">
+          <span class="summary-label">${state.label}</span>
+          <strong>${asset.name}</strong>
+          <small>${state.detail}</small>
+        </article>
+      `).join("")}
+    </div>
+  `;
 }
 
 function renderPositions() {

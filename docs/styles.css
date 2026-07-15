@@ -292,6 +292,113 @@ h3 { font-size: 16px; margin-bottom: 10px; }
   color: var(--bad);
 }
 
+.trade-state,
+.pending-badge,
+.summary-card {
+  border-radius: 8px;
+  padding: 10px;
+}
+
+.trade-state {
+  display: grid;
+  gap: 3px;
+  margin-top: 12px;
+  border: 1px solid var(--line);
+  background: #f8fafc;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.trade-state strong,
+.pending-badge strong,
+.summary-card strong {
+  line-height: 1.35;
+}
+
+.trade-state span,
+.pending-badge span,
+.summary-card span,
+.summary-card small {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.trade-state.success,
+.summary-card.success {
+  border-color: #bbf7d0;
+  background: #f0fdf4;
+  color: #166534;
+}
+
+.trade-state.success span,
+.summary-card.success span,
+.summary-card.success small {
+  color: #3f6212;
+}
+
+.trade-state.pending,
+.summary-card.pending {
+  border-color: #fde68a;
+  background: #fffbeb;
+  color: #92400e;
+}
+
+.trade-state.pending span,
+.summary-card.pending span,
+.summary-card.pending small {
+  color: #92400e;
+}
+
+.trade-state.warning,
+.summary-card.warning {
+  border-color: #fed7aa;
+  background: #fff7ed;
+  color: #9a3412;
+}
+
+.trade-state.warning span,
+.summary-card.warning span,
+.summary-card.warning small {
+  color: #9a3412;
+}
+
+.pending-badge {
+  display: grid;
+  gap: 4px;
+  width: 100%;
+  margin: 8px 0 10px;
+  text-align: left;
+  border: 1px solid #fde68a;
+  background: #fffbeb;
+  color: #92400e;
+}
+
+.status-summary {
+  margin-bottom: 12px;
+}
+
+.summary-grid {
+  display: grid;
+  gap: 8px;
+}
+
+.summary-card {
+  display: grid;
+  gap: 4px;
+  border: 1px solid var(--line);
+  background: var(--panel);
+}
+
+.summary-label {
+  font-weight: 700;
+}
+
+.empty-summary {
+  color: var(--muted);
+  background: #fbfcfe;
+}
+
 .asset-actions, .sheet-actions {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -309,6 +416,11 @@ h3 { font-size: 16px; margin-bottom: 10px; }
   background: var(--blue);
   color: white;
   border-color: var(--blue);
+}
+
+.muted-primary {
+  background: #0f766e;
+  border-color: #0f766e;
 }
 
 .secondary {
