@@ -242,7 +242,7 @@ function getAssetTradeState(symbol) {
     return {
       tone: "pending",
       label: "已下单，等待成交",
-      detail: `待买入 ${money(pendingBuy)}，不用重复买`
+      detail: `待买入 ${money(pendingBuy)}，可继续追加或等待成交`
     };
   }
   if (pendingSell > 0) {
@@ -347,12 +347,10 @@ function renderAssets() {
     const pendingHtml = pendingBuy > 0 ? `
         <button class="pending-badge learn-btn" type="button" onclick="showPendingNotice('${asset.symbol}')">
           <strong>待成交买入 ${money(pendingBuy)}</strong>
-          <span>已提交，开盘后刷新会尝试成交</span>
+          <span>已提交；可以追加新订单，也可以等待成交</span>
         </button>
       ` : "";
-    const primaryAction = pendingBuy > 0
-      ? `<button class="primary muted-primary" type="button" onclick="showPendingNotice('${asset.symbol}')">已待成交</button>`
-      : `<button class="primary" type="button" onclick="openSheet('${asset.symbol}')">${holdingValue > 0 ? "追加模拟" : "按建议模拟"}</button>`;
+    const primaryAction = `<button class="primary" type="button" onclick="openSheet('${asset.symbol}')">${holdingValue > 0 || pendingBuy > 0 ? "追加模拟" : "按建议模拟"}</button>`;
     return `
       <article class="asset-card">
         <div class="asset-top">
@@ -500,12 +498,14 @@ function openSheet(symbol) {
   const asset = ASSETS.find((item) => item.symbol === symbol);
   const quote = quotes[symbol];
   const suggestion = getSuggestion(symbol);
+  const pendingBuy = getPendingAmount(symbol, "buy");
   els.tradeTitle.textContent = asset.name;
   els.tradeAssetType.textContent = asset.type;
   els.tradePrice.textContent = formatPrice(quote);
   els.tradeAmount.value = suggestion.amount || 100;
   els.tradeReason.value = suggestion.amount > 0 ? suggestion.summary : "";
-  els.tradeHint.textContent = `${suggestion.summary} 这是模拟交易建议，不是真实买卖建议。`;
+  const pendingText = pendingBuy > 0 ? ` 已有待成交买入 ${money(pendingBuy)}，这次会新增一笔订单，不会覆盖原订单。` : "";
+  els.tradeHint.textContent = `${suggestion.summary}${pendingText} 这是模拟交易建议，不是真实买卖建议。`;
   els.tradeSheet.classList.add("open");
   els.tradeSheet.setAttribute("aria-hidden", "false");
 }
@@ -671,7 +671,7 @@ function showPendingNotice(symbol) {
   const pendingBuy = getPendingAmount(symbol, "buy");
   const pendingSell = getPendingAmount(symbol, "sell");
   const amountText = pendingBuy > 0 ? `待买入 ${money(pendingBuy)}` : `待卖出 ${money(pendingSell)}`;
-  showStatus(`${asset.name} 已经有订单在等待成交：${amountText}。不用重复操作，开盘后刷新页面会尝试成交。`);
+  showStatus(`${asset.name} 已经有订单在等待成交：${amountText}。现实中可以继续追加新订单，也可以等它成交；开盘后刷新页面会尝试成交。`);
 }
 
 function queueOrder(order) {
